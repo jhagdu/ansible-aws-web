@@ -1,0 +1,12 @@
+- hosts: localhost
+  gather_facts: False
+  vars_files:
+    - aws-key.yml
+  roles:
+    - aws
+
+- hosts: webserver
+  gather_facts: False
+  roles:
+    - { role: webserver , become: yes}
+

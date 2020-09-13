@@ -1,0 +1,59 @@
+- name: Creating Key-Pair
+  ec2_key:
+    name: webkey
+    state: present
+  register: webkp
+  notify: Save Key PEM File
+
+- name: Create a security group 
+  ec2_group:
+    name: websg
+    description: Security Group for EC2 Web Servers
+    region: "{{ region }}"
+    state: present
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        from_port: 80
+        to_port: 80
+        cidr_ip: 0.0.0.0/0
+    rules_egress:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: webfirewall
+
+- name: Launch Instance
+  ec2:
+    instance_type: "{{ inst_type }}"
+    image: "{{ ami_id }}"
+    key_name: "{{ webkp.key.name }}"
+    group: 
+      - "{{ webfirewall.group_name }}"
+    wait: yes
+    count: 1
+    instance_tags:
+      Name: webserver
+    vpc_subnet_id: "{{ subnet_id }}"
+    assign_public_ip: yes
+    region: "{{ region }}"
+    state: present
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: web_instance
+
+- name: Update Inventory 
+  lineinfile:
+    path: /etc/ansible/hosts/myhosts.txt
+    insertafter: "[webserver]"
+    line: "{{ item.public_ip }}"
+  with_items: "{{ web_instance.instances }}"
+
+- name: Refreshing Inventory
+  meta: refresh_inventory
+
+- name: Just Sleep for Some Seconds
+  pause:
+    minutes: 1
